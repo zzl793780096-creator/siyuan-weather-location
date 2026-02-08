@@ -1,0 +1,27 @@
+{
+  "name": "siyuan-weather-location",
+  "version": "1.1.0",
+  "description": "思源笔记天气和位置查询插件，支持模板自动插入到每日笔记",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build"
+  },
+  "keywords": [
+    "siyuan",
+    "plugin",
+    "weather",
+    "location",
+    "daily-note"
+  ],
+  "author": "lance",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "siyuan": "^1.0.0"
+  }
+}

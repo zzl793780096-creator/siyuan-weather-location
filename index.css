@@ -1,0 +1,140 @@
+/* 天气位置插件设置样式 - 限定在插件容器内 */
+#weather-location-settings .b3-button--outline {
+    border: 1px solid var(--b3-theme-surface-light);
+    background: transparent;
+}
+
+#weather-location-settings .b3-button--text {
+    border: none;
+    background: transparent;
+    color: var(--b3-theme-on-surface);
+}
+
+#weather-location-settings .config__tab-container {
+    padding: 16px;
+}
+
+#weather-location-settings .config__tab-container-item {
+    margin-bottom: 24px;
+}
+
+#weather-location-settings .config__tab-container-item h3 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--b3-theme-on-surface);
+}
+
+#weather-location-settings .config__item {
+    margin-bottom: 12px;
+}
+
+#weather-location-settings .config__item-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    color: var(--b3-theme-on-surface);
+}
+
+#weather-location-settings .config__item-input,
+#weather-location-settings .config__item-select,
+#weather-location-settings .config__item-textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--b3-border-color);
+    border-radius: 4px;
+    background: var(--b3-theme-background);
+    color: var(--b3-theme-on-background);
+    font-size: 14px;
+    font-family: inherit;
+}
+
+#weather-location-settings .config__item-input:focus,
+#weather-location-settings .config__item-select:focus,
+#weather-location-settings .config__item-textarea:focus {
+    outline: none;
+    border-color: var(--b3-theme-primary);
+}
+
+#weather-location-settings .config__item-textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+#weather-location-settings .config__item-checkbox {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    cursor: pointer;
+}
+
+#weather-location-settings .config__item-help {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: var(--b3-theme-surface-light);
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--b3-theme-on-surface-light);
+}
+
+#weather-location-settings .config__item-help p {
+    margin: 4px 0;
+}
+
+#weather-location-settings .config__item-help a {
+    color: var(--b3-theme-primary);
+    text-decoration: none;
+}
+
+#weather-location-settings .config__item-help a:hover {
+    text-decoration: underline;
+}
+
+/* 移动端适配样式 */
+@media (max-width: 768px) {
+    #weather-location-settings {
+        padding: 12px !important;
+        max-height: 80vh !important;
+    }
+    
+    #weather-location-settings .setting-section {
+        margin-bottom: 16px !important;
+        padding-bottom: 16px !important;
+    }
+    
+    #weather-location-settings .setting-section h3 {
+        font-size: 15px !important;
+        margin-bottom: 12px !important;
+    }
+    
+    #weather-location-settings .setting-item {
+        margin-bottom: 10px !important;
+    }
+    
+    #weather-location-settings .setting-item label {
+        font-size: 13px !important;
+    }
+    
+    #weather-location-settings input[type="text"],
+    #weather-location-settings select,
+    #weather-location-settings textarea {
+        font-size: 14px !important;
+        padding: 10px 12px !important;
+    }
+    
+    #weather-location-settings .setting-actions {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+    
+    #weather-location-settings .setting-actions button {
+        flex: 1 !important;
+        min-width: calc(50% - 4px) !important;
+        padding: 10px 12px !important;
+        font-size: 13px !important;
+    }
+    
+    #weather-location-settings .setting-actions button:nth-child(3) {
+        min-width: 100% !important;
+    }
+}

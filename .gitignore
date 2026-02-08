@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+release/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# SiYuan specific
+.stfolder/
+
+# Temporary files
+*.zip
+*.tar.gz
+*.tmp
+nul
+
+# Test files
+test-*.html
+test-*.js

@@ -1,0 +1,28 @@
+{
+  "name": "siyuan-weather-location",
+  "author": "lance",
+  "url": "https://github.com/username/siyuan-weather-location-plugin",
+  "version": "1.1.0",
+  "minAppVersion": "3.3.0",
+  "backends": ["all"],
+  "frontends": ["all"],
+  "disabledInPublish": false,
+  "displayName": {
+    "default": "Weather & Location",
+    "zh_CN": "天气与位置"
+  },
+  "description": {
+    "default": "Auto-insert weather and location info to daily notes",
+    "zh_CN": "自动查询天气和位置信息，插入到每日笔记中"
+  },
+  "readme": {
+    "default": "README.md",
+    "zh_CN": "README_zh_CN.md"
+  },
+  "funding": {
+    "openCollective": "",
+    "patreon": "",
+    "github": ""
+  },
+  "keywords": ["weather", "location", "daily-note", "template"]
+}

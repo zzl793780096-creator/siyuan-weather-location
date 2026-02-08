@@ -1,6 +1,6 @@
 {
   "name": "siyuan-weather-location",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "思源笔记天气和位置查询插件，支持模板自动插入到每日笔记",
   "main": "dist/index.js",
   "scripts": {

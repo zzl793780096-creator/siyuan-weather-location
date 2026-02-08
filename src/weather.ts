@@ -223,35 +223,43 @@ export class WeatherService {
         console.log('[WeatherService] 使用缓存的高德adcode:', adcode);
       }
       
-      // 获取天气预报信息
-      const weatherUrl = `https://restapi.amap.com/v3/weather/weatherInfo?key=${this.config.amapKey}&city=${adcode}&extensions=all`;
-      console.log('[WeatherService] 调用高德天气API...');
-      const weatherResponse = await this.fetchWithTimeout(weatherUrl, 5000);
-      const weatherData = await weatherResponse.json();
+      // 同时获取实时天气和预报数据，合并结果
+      const [liveData, forecastData] = await Promise.all([
+        // 实时数据：包含湿度、精确风力、当前温度
+        this.fetchWithTimeout(`https://restapi.amap.com/v3/weather/weatherInfo?key=${this.config.amapKey}&city=${adcode}&extensions=base`, 5000),
+        // 预报数据：包含最低温度、最高温度
+        this.fetchWithTimeout(`https://restapi.amap.com/v3/weather/weatherInfo?key=${this.config.amapKey}&city=${adcode}&extensions=all`, 5000)
+      ]);
 
-      if (weatherData.status !== '1' || !weatherData.forecasts || weatherData.forecasts.length === 0) {
-        throw new Error('高德天气API失败');
+      const liveResponse = await liveData.json();
+      const forecastResponse = await forecastData.json();
+
+      if (liveResponse.status !== '1' || !liveResponse.lives || liveResponse.lives.length === 0) {
+        throw new Error('高德实时天气API失败');
       }
 
-      const forecast = weatherData.forecasts[0];
-      const casts = forecast.casts || [];
-      const todayCast = casts.length > 0 ? casts[0] : null;
+      if (forecastResponse.status !== '1' || !forecastResponse.forecasts || forecastResponse.forecasts.length === 0) {
+        throw new Error('高德预报天气API失败');
+      }
+
+      const live = liveResponse.lives[0];
+      const forecast = forecastResponse.forecasts[0];
+      const todayCast = forecast.casts?.[0];
       
-      const dayWind = todayCast?.daywind || '东南风';
-      const dayWindPower = todayCast?.daypower || '3';
+      const windPower = live.windpower || '≤3';
       
       return {
-        description: todayCast ? todayCast.dayweather || '晴朗' : '晴朗',
-        temperature: todayCast ? parseInt(todayCast.daytemp) || 25 : 25,
-        humidity: 60,
-        windSpeed: this.parseWindSpeed(dayWindPower),
+        description: live.weather || '晴朗',
+        temperature: parseInt(live.temperature) || 25,
+        humidity: parseInt(live.humidity) || 60,
+        windSpeed: this.parseWindSpeed(windPower),
         pressure: 1013,
         visibility: 10,
         icon: '',
-        tempMin: todayCast ? parseInt(todayCast.nighttemp) || 20 : 20,
-        tempMax: todayCast ? parseInt(todayCast.daytemp) || 28 : 28,
-        windDirection: dayWind,
-        windPower: dayWindPower + '级'
+        tempMin: todayCast ? parseInt(todayCast.nighttemp) || 20 : parseInt(live.temperature) || 20,
+        tempMax: todayCast ? parseInt(todayCast.daytemp) || 28 : parseInt(live.temperature) || 28,
+        windDirection: live.winddirection || '东南风',
+        windPower: windPower.replace('≤', '') + '级'
       } as WeatherData;
     } catch (error) {
       console.error('[WeatherService] 高德天气API错误:', error);

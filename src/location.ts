@@ -365,14 +365,21 @@ export class LocationService {
         throw new Error('新浪IP查询未返回城市信息');
       }
       
-      // 新浪只返回城市名，需要查询坐标
-      // 但为了速度，我们先返回一个默认坐标，让用户可以立即看到城市名
+      // 新浪只返回城市名，需要通过城市名查询坐标
+      console.log('[LocationService] 新浪IP查询成功，正在查询城市坐标...');
+      const coordinates = await this.getCoordinatesByCity(cityName);
+      
+      if (!coordinates) {
+        console.error('[LocationService] 无法获取城市坐标:', cityName);
+        throw new Error('无法获取城市坐标');
+      }
+      
       const result: LocationData = {
         // 基础信息
         city: cityName,
         country: data.country || '中国',
-        lat: 0, // 默认坐标，后续可以通过城市名查询
-        lon: 0,
+        lat: coordinates.lat,
+        lon: coordinates.lon,
         ip: '',
         timezone: '',
         formatted_address: `${cityName}${province ? ', ' + province : ''}${data.country ? ', ' + data.country : ''}`.trim(),
@@ -389,7 +396,7 @@ export class LocationService {
         region: province
       };
       
-      console.log('[LocationService] 新浪IP查询成功:', result.city);
+      console.log('[LocationService] 新浪IP查询成功:', result.city, '坐标:', coordinates);
       return result;
     } catch (error) {
       console.warn('[LocationService] 新浪IP查询失败:', error);

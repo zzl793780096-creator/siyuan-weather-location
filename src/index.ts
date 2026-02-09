@@ -145,6 +145,7 @@ class WeatherLocationPlugin extends Plugin {
   private weatherService!: WeatherService;
   private locationService!: LocationService;
   private templateEngine!: TemplateEngine;
+  private slashCommandsRegistered: boolean = false; // 标记斜杠命令是否已注册
 
   async onload() {
     console.log('[WeatherLocation] Plugin loading...');
@@ -203,14 +204,58 @@ class WeatherLocationPlugin extends Plugin {
       // 清除位置和天气缓存，确保使用新配置
       this.locationService.clearCache();
       this.weatherService.clearCache();
-      // 重新注册斜杠命令（常用城市列表可能已更新）
-      this.registerSlashCommand();
+      // 更新斜杠命令（常用城市列表可能已更新）
+      this.updateSlashCommands();
       // 重新预加载数据
       this.prefetchData();
       console.log('[WeatherLocation] Config saved and cache cleared');
     } catch (error) {
       console.error('[WeatherLocation] Error saving config:', error);
     }
+  }
+
+  // 更新斜杠命令（用于配置更新时，避免完全重新注册导致重复）
+  private updateSlashCommands() {
+    console.log('[WeatherLocation] Updating slash commands...');
+    
+    // 保留第一个命令（插入天气位置模板），只更新城市相关命令
+    const baseCommands = this.protyleSlash && this.protyleSlash.length > 0 
+      ? [this.protyleSlash[0]] 
+      : [{
+          filter: ['天气位置', 'weather location', 'tianqi weizhi', '/tq', '/天气'],
+          html: '<span class="b3-list-item__text">🌤📍 插入天气位置模板</span>',
+          id: 'insert-weather-location-template',
+          callback: async (protyle: any, nodeElement: HTMLElement) => {
+            const data = await this.getTemplateData();
+            const content = this.templateEngine.render(this.config.template, data);
+            this.replaceBlockContent(nodeElement.dataset.nodeId || '', content);
+          }
+        }];
+    
+    // 添加常用城市天气插入命令
+    this.config.favoriteCities.forEach((city, index) => {
+      const pinyinPrefix = city.pinyinPrefix || getPinyinPrefix(city.name);
+      const pinyinFilter = pinyinPrefix ? `${pinyinPrefix}tq` : '';
+      
+      const filters = [`${city.name}天气`, `${city.name} weather`, `${city.name} tianqi`];
+      if (pinyinPrefix) {
+        filters.push(pinyinFilter, `${pinyinPrefix}tianqi`);
+      }
+      
+      baseCommands.push({
+        filter: filters,
+        html: `<span class="b3-list-item__text">🌤 ${city.name}天气${pinyinPrefix ? ` (${pinyinPrefix}tq)` : ''}</span>`,
+        id: `insert-favorite-city-weather-${index}`,
+        callback: async (protyle: any, nodeElement: HTMLElement) => {
+          const data = await this.getTemplateDataForCity(city);
+          const content = this.templateEngine.render(this.config.template, data);
+          this.replaceBlockContent(nodeElement.dataset.nodeId || '', content);
+        }
+      });
+    });
+    
+    this.protyleSlash = baseCommands;
+    console.log('[WeatherLocation] Slash commands updated, count:', baseCommands.length);
   }
 
   // 预加载位置和天气数据（后台异步执行）
@@ -286,11 +331,17 @@ class WeatherLocationPlugin extends Plugin {
     console.log('[WeatherLocation] Commands registered');
   }
 
-  // 注册斜杠命令
+  // 注册斜杠命令（仅在插件加载时调用一次）
   private registerSlashCommand() {
     console.log('[WeatherLocation] Registering slash commands...');
     
-    // 清空现有的斜杠命令，避免重复
+    // 如果已经注册过，跳过（避免重复）
+    if (this.slashCommandsRegistered) {
+      console.log('[WeatherLocation] 斜杠命令已注册，跳过重复注册');
+      return;
+    }
+    
+    // 清空现有的斜杠命令
     this.protyleSlash = [];
     
     const slashCommands: any[] = [
@@ -334,8 +385,10 @@ class WeatherLocationPlugin extends Plugin {
       }
     });
     
+    // 使用数组赋值方式，确保思源笔记能正确识别
     this.protyleSlash = slashCommands;
-    console.log('[WeatherLocation] Slash commands registered');
+    this.slashCommandsRegistered = true;
+    console.log('[WeatherLocation] Slash commands registered, count:', slashCommands.length);
   }
 
   private registerMenu() {

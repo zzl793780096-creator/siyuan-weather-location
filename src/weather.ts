@@ -112,8 +112,8 @@ export class WeatherService {
   // OpenWeatherMap API
   private async getOpenWeatherData(lat: number, lon: number): Promise<WeatherData | null> {
     if (!this.config.weatherApiKey) {
-      console.warn('[WeatherService] 未配置天气 API Key，使用模拟数据');
-      return this.getMockWeatherData();
+      console.error('[WeatherService] 未配置天气 API Key，无法获取真实天气数据');
+      throw new Error('未配置天气 API Key，请在插件设置中配置 OpenWeatherMap API Key');
     }
 
     try {
@@ -137,8 +137,22 @@ export class WeatherService {
         throw new Error('天气数据格式错误');
       }
       
+      // 验证关键数据是否存在且有效
+      if (data.main.humidity === undefined || data.main.humidity === null) {
+        console.warn('[WeatherService] API 返回的湿度数据为空');
+      }
+      if (data.main.pressure === undefined || data.main.pressure === null) {
+        console.warn('[WeatherService] API 返回的气压数据为空');
+      }
+      if (data.main.temp === undefined || data.main.temp === null) {
+        throw new Error('API 返回的温度数据为空');
+      }
+      
       const windDeg = data.wind?.deg || 0;
       const windSpeed = data.wind?.speed || 0;
+      
+      // 能见度：从米转换为公里，如果没有则返回undefined（不使用默认值）
+      const visibilityKm = data.visibility ? data.visibility / 1000 : undefined;
       
       return {
         description: this.translateWeatherDescription(data.weather[0]?.description || '未知'),
@@ -146,11 +160,11 @@ export class WeatherService {
         humidity: data.main.humidity,
         windSpeed: windSpeed,
         pressure: data.main.pressure,
-        visibility: data.visibility ? data.visibility / 1000 : 10,
+        visibility: visibilityKm,
         icon: data.weather[0]?.icon || '',
-        feelsLike: Math.round(data.main.feels_like),
-        tempMin: Math.round(data.main.temp_min),
-        tempMax: Math.round(data.main.temp_max),
+        feelsLike: data.main.feels_like !== undefined ? Math.round(data.main.feels_like) : undefined,
+        tempMin: data.main.temp_min !== undefined ? Math.round(data.main.temp_min) : undefined,
+        tempMax: data.main.temp_max !== undefined ? Math.round(data.main.temp_max) : undefined,
         sunrise: data.sys.sunrise ? new Date(data.sys.sunrise * 1000).toLocaleTimeString('zh-CN') : undefined,
         sunset: data.sys.sunset ? new Date(data.sys.sunset * 1000).toLocaleTimeString('zh-CN') : undefined,
         windDirection: this.getWindDirection(windDeg),
@@ -158,14 +172,7 @@ export class WeatherService {
       };
     } catch (error) {
       console.error('[WeatherService] 获取天气数据失败:', error);
-      if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          console.warn('[WeatherService] 天气 API 请求超时，使用模拟数据');
-        } else {
-          console.warn(`[WeatherService] ${error.message}，使用模拟数据`);
-        }
-      }
-      return this.getMockWeatherData();
+      throw error;
     }
   }
 
@@ -196,7 +203,8 @@ export class WeatherService {
   // 高德地图天气API
   private async getAmapWeatherData(lat: number, lon: number): Promise<WeatherData | null> {
     if (!this.config.amapKey) {
-      return this.getMockWeatherData();
+      console.error('[WeatherService] 未配置高德地图 API Key，无法获取真实天气数据');
+      throw new Error('未配置高德地图 API Key，请在插件设置中配置');
     }
 
     try {
@@ -248,22 +256,79 @@ export class WeatherService {
       
       const windPower = live.windpower || '≤3';
       
+      // 解析湿度，确保从API返回的数据正确转换
+      const rawHumidity = live.humidity;
+      const parsedHumidity = parseInt(rawHumidity);
+      
+      // 验证湿度数据是否来自真实API
+      if (rawHumidity === undefined || rawHumidity === null || rawHumidity === '') {
+        console.error('[WeatherService] 高德API返回的湿度数据为空，请检查API配置和调用限制');
+        throw new Error('无法获取真实湿度数据，API返回为空');
+      }
+      
+      const humidity = isNaN(parsedHumidity) ? 60 : parsedHumidity;
+      
+      // 验证温度数据
+      const rawTemperature = live.temperature;
+      if (rawTemperature === undefined || rawTemperature === null || rawTemperature === '') {
+        console.error('[WeatherService] 高德API返回的温度数据为空');
+        throw new Error('无法获取真实温度数据，API返回为空');
+      }
+      const temperature = parseInt(rawTemperature);
+      if (isNaN(temperature)) {
+        throw new Error('温度数据格式无效');
+      }
+      
+      // 解析预报数据中的最低/最高温度
+      let tempMin: number | undefined;
+      let tempMax: number | undefined;
+      
+      if (todayCast) {
+        const rawNightTemp = todayCast.nighttemp;
+        const rawDayTemp = todayCast.daytemp;
+        
+        if (rawNightTemp !== undefined && rawNightTemp !== null && rawNightTemp !== '') {
+          const parsedNightTemp = parseInt(rawNightTemp);
+          if (!isNaN(parsedNightTemp)) {
+            tempMin = parsedNightTemp;
+          }
+        }
+        
+        if (rawDayTemp !== undefined && rawDayTemp !== null && rawDayTemp !== '') {
+          const parsedDayTemp = parseInt(rawDayTemp);
+          if (!isNaN(parsedDayTemp)) {
+            tempMax = parsedDayTemp;
+          }
+        }
+      }
+      
+      console.log('[WeatherService] 高德天气数据:', {
+        rawHumidity,
+        parsedHumidity,
+        humidity,
+        rawTemperature,
+        temperature,
+        tempMin,
+        tempMax,
+        weather: live.weather
+      });
+      
       return {
         description: live.weather || '晴朗',
-        temperature: parseInt(live.temperature) || 25,
-        humidity: parseInt(live.humidity) || 60,
+        temperature: temperature,
+        humidity: humidity,
         windSpeed: this.parseWindSpeed(windPower),
-        pressure: 1013,
-        visibility: 10,
+        pressure: undefined, // 高德API不返回气压数据，不设置固定值
+        visibility: undefined, // 高德API不返回能见度数据，不设置固定值
         icon: '',
-        tempMin: todayCast ? parseInt(todayCast.nighttemp) || 20 : parseInt(live.temperature) || 20,
-        tempMax: todayCast ? parseInt(todayCast.daytemp) || 28 : parseInt(live.temperature) || 28,
+        tempMin: tempMin,
+        tempMax: tempMax,
         windDirection: live.winddirection || '东南风',
         windPower: windPower.replace('≤', '') + '级'
       } as WeatherData;
     } catch (error) {
       console.error('[WeatherService] 高德天气API错误:', error);
-      return this.getMockWeatherData();
+      throw error;
     }
   }
 
@@ -311,21 +376,4 @@ export class WeatherService {
     return translations[description.toLowerCase()] || description;
   }
 
-  // 模拟天气数据（当API不可用时）
-  private getMockWeatherData(): WeatherData {
-    return {
-      description: '晴朗',
-      temperature: 25,
-      humidity: 60,
-      windSpeed: 3.5,
-      pressure: 1013,
-      visibility: 10,
-      icon: '01d',
-      feelsLike: 26,
-      tempMin: 20,
-      tempMax: 28,
-      windDirection: '东南风',
-      windPower: '3级'
-    };
-  }
 }

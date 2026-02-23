@@ -61,7 +61,7 @@ export class TemplateEngine {
   // 处理条件语句
   private replaceConditionals(template: string, data: any): string {
     // 处理 {{#if condition}}...{{/if}}
-    const ifRegex = /\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g;
+    const ifRegex = /\{\{#if\s+([\w.]+)\}\}([\s\S]*?)\{\{\/if\}\}/g;
     
     return template.replace(ifRegex, (match, condition, content) => {
       const value = this.getNestedValue(data, condition);
@@ -79,7 +79,7 @@ export class TemplateEngine {
 
   // 处理循环
   private replaceLoops(template: string, data: any): string {
-    const eachRegex = /\{\{#each\s+(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g;
+    const eachRegex = /\{\{#each\s+([\w.]+)\}\}([\s\S]*?)\{\{\/each\}\}/g;
     
     return template.replace(eachRegex, (match, arrayName, content) => {
       const array = this.getNestedValue(data, arrayName);

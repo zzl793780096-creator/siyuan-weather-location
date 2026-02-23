@@ -466,7 +466,7 @@ class WeatherLocationPlugin extends Plugin {
           <h3 style="margin: 0 0 15px 0; font-size: 16px; font-weight: 600; color: #333;">常用城市 <span style="font-size: 12px; font-weight: normal; color: #999;">(最多5个)</span></h3>
           
           <!-- 添加方式切换 -->
-          <div class="setting-item" style="margin-bottom: 12px;" id="favorite-city-search-container" ${this.config.favoriteCities.length >= MAX_FAVORITE_CITIES ? 'style="display: none;"' : ''}>
+          <div class="setting-item" id="favorite-city-search-container" style="margin-bottom: 12px; display: ${this.config.favoriteCities.length >= MAX_FAVORITE_CITIES ? 'none' : 'block'};">
             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
               <button id="toggle-search-mode" class="city-add-mode-btn active" style="padding: 6px 12px; border: 1px solid #1890ff; border-radius: 4px; background: #1890ff; color: white; cursor: pointer; font-size: 13px;">搜索添加</button>
               <button id="toggle-manual-mode" class="city-add-mode-btn" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; font-size: 13px;">手动录入</button>
@@ -719,6 +719,21 @@ class WeatherLocationPlugin extends Plugin {
       }
     });
 
+    // 搜索结果悬停高亮
+    searchResults.addEventListener('mouseover', (e) => {
+      const target = (e.target as HTMLElement).closest('.city-search-result') as HTMLElement;
+      if (target) {
+        target.style.backgroundColor = '#f5f5f5';
+      }
+    });
+
+    searchResults.addEventListener('mouseout', (e) => {
+      const target = (e.target as HTMLElement).closest('.city-search-result') as HTMLElement;
+      if (target) {
+        target.style.backgroundColor = '';
+      }
+    });
+
     // 点击外部关闭搜索结果
     document.addEventListener('click', (e) => {
       if (!searchInput.contains(e.target as Node) && !searchResults.contains(e.target as Node)) {
@@ -768,23 +783,26 @@ class WeatherLocationPlugin extends Plugin {
     }
   }
 
-  // 搜索城市（使用 OpenStreetMap Nominatim API）
+  // 搜索城市（优先高德，失败时回退到 OpenStreetMap Nominatim）
   private async searchCities(query: string): Promise<CitySearchResult[]> {
     if (!query || query.length < 2) {
       return [];
     }
 
-    try {
-      console.log('[WeatherLocation] 开始搜索城市:', query);
+    console.log('[WeatherLocation] 开始搜索城市:', query);
 
-      // 使用高德地图地理编码 API
-      const amapKey = this.config.amapKey;
-      if (!amapKey) {
-        throw new Error('未配置高德地图 API Key，请在设置中配置');
+    const amapKey = this.config.amapKey;
+    if (!amapKey) {
+      console.log('[WeatherLocation] 未配置高德地图 Key，使用 Nominatim 搜索');
+      const fallbackResults = await this.searchCitiesByNominatim(query);
+      if (fallbackResults.length === 0) {
+        showMessage('未找到匹配的城市');
       }
+      return fallbackResults;
+    }
 
+    try {
       const url = `https://restapi.amap.com/v3/geocode/geo?address=${encodeURIComponent(query)}&key=${amapKey}`;
-
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -815,7 +833,7 @@ class WeatherLocationPlugin extends Plugin {
       const results = data.geocodes.map((item: any) => {
         // 判断搜索的是否为县/区级别（搜索词包含"县"、"区"、"镇"等）
         const isCountySearch = /[县区镇乡]/.test(query);
-        
+
         let cityName: string;
         if (isCountySearch && item.district) {
           // 如果是县/区级别搜索，优先使用 district 字段
@@ -824,7 +842,7 @@ class WeatherLocationPlugin extends Plugin {
           // 否则按优先级：city > district > province
           cityName = item.city || item.district || item.province || query;
         }
-        
+
         // 移除末尾的"市"、"县"、"区"等，保持简洁
         const cleanCityName = cityName.replace(/[市区县]$/, '');
         return {
@@ -838,14 +856,60 @@ class WeatherLocationPlugin extends Plugin {
       console.log('[WeatherLocation] 搜索结果:', results);
       return results;
     } catch (error) {
-      console.error('[WeatherLocation] 城市搜索失败:', error);
-      if (error instanceof Error) {
-        if (error.name === 'AbortError') {
+      console.warn('[WeatherLocation] 高德搜索失败，回退到 Nominatim:', error);
+      const fallbackResults = await this.searchCitiesByNominatim(query);
+      if (fallbackResults.length === 0) {
+        if (error instanceof Error && error.name === 'AbortError') {
           showMessage('搜索超时，请重试');
-        } else {
+        } else if (error instanceof Error) {
           showMessage(`搜索失败: ${error.message}`);
+        } else {
+          showMessage('搜索失败，请重试');
         }
+      } else {
+        showMessage('已切换备用搜索服务');
       }
+      return fallbackResults;
+    }
+  }
+
+  private async searchCitiesByNominatim(query: string): Promise<CitySearchResult[]> {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=8&q=${encodeURIComponent(query)}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Nominatim 请求失败: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (!Array.isArray(data) || data.length === 0) {
+        return [];
+      }
+
+      return data
+        .map((item: any) => {
+          const name = String(item.display_name || query).split(',')[0].trim() || query;
+          return {
+            name: name.replace(/[市区县]$/, ''),
+            lat: parseFloat(item.lat),
+            lon: parseFloat(item.lon),
+            displayName: item.display_name || name
+          } as CitySearchResult;
+        })
+        .filter((item: CitySearchResult) => !Number.isNaN(item.lat) && !Number.isNaN(item.lon));
+    } catch (error) {
+      console.error('[WeatherLocation] Nominatim 搜索失败:', error);
       return [];
     }
   }
@@ -857,7 +921,7 @@ class WeatherLocationPlugin extends Plugin {
     }
 
     return results.map((city, index) => `
-      <div class="city-search-result" data-index="${index}" style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 14px; hover: background-color: #f5f5f5;">
+      <div class="city-search-result" data-index="${index}" style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 14px;">
         <div style="font-weight: 500;">${city.name}</div>
         <div style="font-size: 12px; color: #999; margin-top: 2px;">${city.displayName}</div>
       </div>
@@ -938,7 +1002,7 @@ class WeatherLocationPlugin extends Plugin {
       return false;
     }
 
-    if (!name || !lat || !lon) {
+    if (!name || Number.isNaN(lat) || Number.isNaN(lon)) {
       showMessage('请填写完整的城市信息');
       return false;
     }

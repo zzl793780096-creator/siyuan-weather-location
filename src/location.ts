@@ -32,7 +32,7 @@ const CITY_NAME_TRANSLATIONS: Record<string, string> = {
   'kunming': '昆明', 'lanzhou': '兰州', 'xining': '西宁', 'yinchuan': '银川',
   'wulumuqi': '乌鲁木齐', 'lasa': '拉萨', 'huhehaote': '呼和浩特', 'haikou': '海口',
   'fuzhou': '福州', 'hefei': '合肥', 'nanchang': '南昌', 'changsha': '长沙',
-  'kunshan': '昆明',
+  'kunshan': '昆山',
   // 其他主要城市
   'suzhou': '苏州', 'wuxi': '无锡', 'changzhou': '常州', 'ningbo': '宁波',
   'wenzhou': '温州', 'jiaxing': '嘉兴', 'huzhou': '湖州', 'shaoxing': '绍兴',
@@ -365,15 +365,14 @@ export class LocationService {
         throw new Error('新浪IP查询未返回城市信息');
       }
       
-      // 新浪只返回城市名，需要通过城市名查询坐标
+      // 新浪只返回城市名，需要再查询一次坐标，避免后续天气请求落到 (0, 0)
       console.log('[LocationService] 新浪IP查询成功，正在查询城市坐标...');
-      const coordinates = await this.getCoordinatesByCity(cityName);
-      
+      const coordinateQuery = `${province}${cityName}`.trim() || cityName;
+      const coordinates = await this.getCoordinatesByCity(coordinateQuery);
       if (!coordinates) {
-        console.error('[LocationService] 无法获取城市坐标:', cityName);
-        throw new Error('无法获取城市坐标');
+        console.warn('[LocationService] 新浪IP查询成功，但无法解析城市坐标:', coordinateQuery);
+        return null;
       }
-      
       const result: LocationData = {
         // 基础信息
         city: cityName,
@@ -597,14 +596,30 @@ export class LocationService {
       return null;
     }
 
-    // 解析手动位置格式: "城市名,纬度,经度" 或 "城市名"
+    // 解析手动位置格式:
+    // 1) "城市名,纬度,经度"
+    // 2) "城市名,国家,纬度,经度"（向后兼容）
     const parts = this.config.manualLocation.split(',');
     
     if (parts.length >= 3) {
       const city = parts[0].trim();
-      const country = parts[1]?.trim() || '';
-      const lat = parseFloat(parts[2]);
-      const lon = parseFloat(parts[3]) || 0;
+      let country = '';
+      let lat: number;
+      let lon: number;
+
+      if (parts.length >= 4) {
+        country = parts[1]?.trim() || '';
+        lat = parseFloat(parts[2]);
+        lon = parseFloat(parts[3]);
+      } else {
+        lat = parseFloat(parts[1]);
+        lon = parseFloat(parts[2]);
+      }
+
+      if (!city || Number.isNaN(lat) || Number.isNaN(lon)) {
+        console.warn('[LocationService] 手动位置格式不正确，解析失败:', this.config.manualLocation);
+        return null;
+      }
       
       return {
         // 基础信息

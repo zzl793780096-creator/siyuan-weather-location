@@ -3,8 +3,8 @@ export interface WeatherData {
   temperature: number;
   humidity: number;
   windSpeed: number;
-  pressure: number;
-  visibility: number;
+  pressure?: number;
+  visibility?: number;
   icon: string;
   feelsLike?: number;
   tempMin?: number;
@@ -148,6 +148,11 @@ export class WeatherService {
         throw new Error('API 返回的温度数据为空');
       }
       
+      const description = data.weather[0]?.description;
+      if (!description) {
+        throw new Error('天气描述为空');
+      }
+
       const windDeg = data.wind?.deg || 0;
       const windSpeed = data.wind?.speed || 0;
       
@@ -155,7 +160,7 @@ export class WeatherService {
       const visibilityKm = data.visibility ? data.visibility / 1000 : undefined;
       
       return {
-        description: this.translateWeatherDescription(data.weather[0]?.description || '未知'),
+        description: this.translateWeatherDescription(description),
         temperature: Math.round(data.main.temp),
         humidity: data.main.humidity,
         windSpeed: windSpeed,
@@ -254,7 +259,10 @@ export class WeatherService {
       const forecast = forecastResponse.forecasts[0];
       const todayCast = forecast.casts?.[0];
       
-      const windPower = live.windpower || '≤3';
+      const windPower = live.windpower;
+      if (!windPower) {
+        throw new Error('风力数据为空');
+      }
       
       // 解析湿度，确保从API返回的数据正确转换
       const rawHumidity = live.humidity;
@@ -266,7 +274,10 @@ export class WeatherService {
         throw new Error('无法获取真实湿度数据，API返回为空');
       }
       
-      const humidity = isNaN(parsedHumidity) ? 60 : parsedHumidity;
+      if (isNaN(parsedHumidity)) {
+        throw new Error('湿度数据格式无效');
+      }
+      const humidity = parsedHumidity;
       
       // 验证温度数据
       const rawTemperature = live.temperature;
@@ -313,8 +324,12 @@ export class WeatherService {
         weather: live.weather
       });
       
+      if (!live.weather) {
+        throw new Error('天气描述为空');
+      }
+
       return {
-        description: live.weather || '晴朗',
+        description: live.weather,
         temperature: temperature,
         humidity: humidity,
         windSpeed: this.parseWindSpeed(windPower),
@@ -323,7 +338,7 @@ export class WeatherService {
         icon: '',
         tempMin: tempMin,
         tempMax: tempMax,
-        windDirection: live.winddirection || '东南风',
+        windDirection: live.winddirection || undefined,
         windPower: windPower.replace('≤', '') + '级'
       } as WeatherData;
     } catch (error) {
@@ -350,7 +365,7 @@ export class WeatherService {
       };
       return windSpeedMap[level] || level * 2;
     }
-    return 3;
+    throw new Error(`风力数据格式无效: ${windPower}`);
   }
 
   // 翻译天气描述（OpenWeatherMap返回的是英文）

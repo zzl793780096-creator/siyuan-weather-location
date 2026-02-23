@@ -227,6 +227,7 @@ class WeatherLocationPlugin extends Plugin {
           id: 'insert-weather-location-template',
           callback: async (protyle: any, nodeElement: HTMLElement) => {
             const data = await this.getTemplateData();
+            if (!data) return;
             const content = this.templateEngine.render(this.config.template, data);
             this.replaceBlockContent(nodeElement.dataset.nodeId || '', content);
           }
@@ -248,6 +249,7 @@ class WeatherLocationPlugin extends Plugin {
         id: `insert-favorite-city-weather-${index}`,
         callback: async (protyle: any, nodeElement: HTMLElement) => {
           const data = await this.getTemplateDataForCity(city);
+          if (!data) return;
           const content = this.templateEngine.render(this.config.template, data);
           this.replaceBlockContent(nodeElement.dataset.nodeId || '', content);
         }
@@ -351,6 +353,7 @@ class WeatherLocationPlugin extends Plugin {
         id: 'insert-weather-location-template',
         callback: async (protyle: any, nodeElement: HTMLElement) => {
           const data = await this.getTemplateData();
+          if (!data) return;
           const content = this.templateEngine.render(this.config.template, data);
           this.replaceBlockContent(nodeElement.dataset.nodeId || '', content);
         }
@@ -375,6 +378,7 @@ class WeatherLocationPlugin extends Plugin {
         id: `insert-favorite-city-weather-${index}`,
         callback: async (protyle: any, nodeElement: HTMLElement) => {
           const data = await this.getTemplateDataForCity(city);
+          if (!data) return;
           const content = this.templateEngine.render(this.config.template, data);
           this.replaceBlockContent(nodeElement.dataset.nodeId || '', content);
         }
@@ -1287,6 +1291,10 @@ class WeatherLocationPlugin extends Plugin {
       showMessage('正在获取数据...');
 
       const data = await this.getTemplateData();
+      if (!data) {
+        showMessage('获取失败：天气或位置信息不可用');
+        return;
+      }
 
       const result = `天气: ${data.weather.description}
 温度: ${data.weather.temperature}°C
@@ -1384,21 +1392,14 @@ class WeatherLocationPlugin extends Plugin {
   }
 
   // 获取指定城市的模板数据
-  async getTemplateDataForCity(city: FavoriteCity): Promise<any> {
+  async getTemplateDataForCity(city: FavoriteCity): Promise<any | null> {
     const weather = await this.getWeatherDataForCity(city);
+    if (!weather) {
+      return null;
+    }
 
     return {
-      weather: weather || {
-        description: '未知',
-        temperature: '--',
-        humidity: '--',
-        windSpeed: '--',
-        windDirection: '--',
-        windPower: '--',
-        pressure: '--',
-        visibility: '--',
-        icon: ''
-      },
+      weather,
       location: {
         city: city.name,
         country: '',
@@ -1432,37 +1433,18 @@ class WeatherLocationPlugin extends Plugin {
   }
 
   // 获取完整数据对象（用于模板）
-  async getTemplateData(): Promise<any> {
+  async getTemplateData(): Promise<any | null> {
     const [weather, location] = await Promise.all([
       this.getWeatherData(),
       this.getLocationData()
     ]);
+    if (!weather || !location) {
+      return null;
+    }
 
     return {
-      weather: weather || {
-        description: '未知',
-        temperature: '--',
-        humidity: '--',
-        windSpeed: '--',
-        windDirection: '--',
-        windPower: '--',
-        pressure: '--',
-        visibility: '--',
-        icon: ''
-      },
-      location: location || {
-        city: '未知',
-        country: '',
-        province: '',
-        district: '',
-        township: '',
-        street: '',
-        streetNumber: '',
-        formatted_address: '',
-        lat: 0,
-        lon: 0,
-        region: ''
-      },
+      weather,
+      location,
       time: new Date().toLocaleString('zh-CN')
     };
   }
@@ -1488,6 +1470,7 @@ class WeatherLocationPlugin extends Plugin {
   // 插入模板到当前文档
   private async insertTemplateToCurrentDoc() {
     const data = await this.getTemplateData();
+    if (!data) return;
     const content = this.templateEngine.render(this.config.template, data);
     await this.insertContentToCurrentDoc(content);
   }
@@ -1513,6 +1496,7 @@ class WeatherLocationPlugin extends Plugin {
   // 在指定块插入模板
   private async insertTemplateAtBlock(blockId: string) {
     const data = await this.getTemplateData();
+    if (!data) return;
     const content = this.templateEngine.render(this.config.template, data);
     await this.insertContentAtBlock(blockId, content);
   }
